@@ -1,15 +1,15 @@
 <template>
     <div class="text-white mb-8">
-       <div class="places-input text-gray-800">
-           <input type="text" class="w-full" placeholder="test">
+       <div class="places-input text-gray-800 shadow-2xl">
+           <input type="text" class="w-full border-none rounded-lg" id="city-search" name="city-search" placeholder="Search cities, places...">
        </div>
 
-        <div class="weather-container font-sans w-128 max-w-lg overflow-hidden bg-gray-900 shadow-lg mt-4 rounded-lg">
+        <div class="weather-container font-sans w-128 max-w-lg overflow-hidden bg-gray-900 shadow-2xl mt-4 rounded-lg">
             <div class="current-weather flex items-center justify-between px-6 py-8">
                 <div class="flex items-center">
                     <div>
                         <div class="text-6xl font-semibold">{{ currentTemperature.actual }} °C</div>
-                        <div>Feels like {{ currentTemperature.feelsLike }} °C</div>
+                        <div class="mt-2">Feels like {{ currentTemperature.feelsLike }} °C</div>
                     </div>
                     <div class="mx-5">
                         <div class="text-2xl font-semibold">{{ currentTemperature.summary }}</div>
@@ -17,52 +17,34 @@
                     </div>
                 </div>
                 <div>
-                    <img v-bind:src="currentTemperature.icon" alt="actualWeatherIcon"/>
+                    <img v-bind:src="currentTemperature.icon" id="iconCurrent" alt="actualWeatherIcon"/>
                 </div>
             </div> <!-- /.current-weather -->
 
 
             <div class="future-weather text-sm bg-gray-800 px-6 py-8 overflow-hidden">
-                <div class="flex items-center">
-                    <div class="w-1/6 text-lg text-gray-200">MON</div>
+
+                <div
+                    v-for="(day, index) in daily"
+                    :key="index"
+                    class="flex items-center"
+                    :class="{ 'mt-8' : index > 0 }"
+                    v-if="index < 5"
+                >
+                    <div class="w-1/6 text-lg text-gray-200">{{ toDayOfWeek(day.date) }}</div>
                     <div class="w-4/6 px-4 flex items-center">
-                        <div>icon</div>
-                        <div class="ml-3">Cloudy with a chance of showers</div>
+                        <div>
+                            <img v-bind:src="day.icon" :id="`icon${index+1}`" width="24" height="24" alt="futureWeatherIcon"/>
+                        </div>
+                        <div class="ml-3">{{ day.summary }}</div>
                     </div>
                     <div class="w-1/6 text-right">
-                        <div>5°C</div>
-                        <div>-2°C</div>
+                        <div>{{ day.temperature }}°C</div>
+                        <div>{{ day.temperatureApparent }}°C</div>
                     </div>
                 </div>
 
-
-                <div class="flex items-center mt-8">
-                    <div class="w-1/6 text-lg text-gray-200">TUE</div>
-                    <div class="w-4/6 px-4 flex items-center">
-                        <div>icon</div>
-                        <div class="ml-3">Cloudy with a chance of showers</div>
-                    </div>
-                    <div class="w-1/6 text-right">
-                        <div>5°C</div>
-                        <div>-2°C</div>
-                    </div>
-                </div>
-
-
-                <div class="flex items-center mt-8">
-                    <div class="w-1/6 text-lg text-gray-200">WED</div>
-                    <div class="w-4/6 px-4 flex items-center">
-                        <div>icon</div>
-                        <div class="ml-3">Cloudy with a chance of showers</div>
-                    </div>
-                    <div class="w-1/6 text-right">
-                        <div>5°C</div>
-                        <div>-2°C</div>
-                    </div>
-                </div>
             </div><!-- /.future-weather -->
-
-
         </div><!-- /.weather-container -->
     </div>
 </template>
@@ -71,11 +53,21 @@
 export default {
     mounted() {
         console.log('WeatherComponent mounted');
+        const jawg = new JawgPlaces.Input({
+            input: '#city-search',
+            searchOnTyping: true,
+            size: 5,
+            onClick: (features) => {
+                this.parseApiLocation(features);
+                this.fetchData();
+            }
+        });
+
         //this.fetchData();
-        //this.testData();
     },
     data() {
         return {
+            currentDate: new Date(),
             currentTemperature: {
                 actual: '',
                 feelsLike: '',
@@ -87,7 +79,7 @@ export default {
                 'lat': 43.6532,
                 'lng': -79.3832
             },
-
+            daily: [],
             //WeatherCode to summary
             weatherCodeFullDay: {
                 "0": "Unknown",
@@ -193,27 +185,61 @@ export default {
             fetch(`/api/weather?lat=${this.location.lat}&lng=${this.location.lng}`)
                 .then(response => response.json())
                 .then(data => {
+                    console.log(data);
                     const timelines = data.data.timelines[0];
                     let weatherCode = timelines.intervals[0].values.weatherCodeFullDay;
-                    let iconCode = weatherCode + "0";
+                    let iconCode = null;
+                    if (this.currentDate.getHours() > 18) {
+                        iconCode = weatherCode + "1";
+                    }else{
+                        iconCode = weatherCode + "0";
+                    }
 
                     this.currentTemperature.actual = Math.round(timelines.intervals[0].values.temperature);
                     this.currentTemperature.feelsLike = Math.round(timelines.intervals[0].values.temperatureApparent);
                     this.currentTemperature.summary = this.weatherCodeFullDay[weatherCode];
                     this.currentTemperature.icon = "icons/png/"+ iconCode + ".png";
 
-                    console.log(this.currentTemperature);
+                    this.daily = timelines.intervals.map(interval => {
+                        let weatherCode = interval.values.weatherCodeFullDay;
+                        let iconCode = null;
+                        if (this.currentDate.getHours() > 18) {
+                            iconCode = weatherCode + "1";
+                        }else{
+                            iconCode = weatherCode + "0";
+                        }
+                        return {
+                            date: interval.startTime,
+                            temperature: Math.round(interval.values.temperature),
+                            temperatureApparent: Math.round(interval.values.temperatureApparent),
+                            summary: this.weatherCodeFullDay[weatherCode],
+                            icon: "icons/png/"+ iconCode + ".png"
+                        }
+                    });
                 })
                 .catch(error => console.error(error))
         },
-        testData() {
-            let weatherCode = this.data.timelines[0].intervals[0].values.weatherCodeFullDay;
-            let iconCode = weatherCode + "0";
-
-            this.currentTemperature.actual = Math.round(this.data.timelines[0].intervals[0].values.temperature);
-            this.currentTemperature.feelsLike = Math.round(this.data.timelines[0].intervals[0].values.temperatureApparent);
-            this.currentTemperature.summary = this.weatherCodeFullDay[weatherCode];
-            this.currentTemperature.icon = "icons/png/"+ iconCode + ".png";
+        toDayOfWeek(date) {
+            let day = new Date(date);
+            return day.toLocaleDateString("en-US", { weekday: "short" }).toUpperCase();
+        },
+        setLocation(location) {
+            if (location.lat && location.lng && location.name) {
+                this.location = location;
+            }else{
+                console.log("Invalid location");
+            }
+        },
+        parseApiLocation(features){
+            const geometry = features.geometry;
+            const name = features.properties.name;
+            const country = features.properties.country;
+            const location = {
+                'name': name + "," + country,
+                'lat': geometry.coordinates[1],
+                'lng': geometry.coordinates[0],
+            };
+            this.setLocation(location);
         }
     }
 }
