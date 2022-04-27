@@ -63,7 +63,7 @@ export default {
             }
         });
 
-        //this.fetchData();
+        this.fetchData();
     },
     data() {
         return {
